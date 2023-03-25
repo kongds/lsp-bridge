@@ -759,14 +759,16 @@ So we build this macro to restore postion after code format."
 (defun lsp-bridge-check-org-babel-lsp-server ()
   "Check if current point is in org babel block. "
   (if (and lsp-bridge--org-babel-block-bop lsp-bridge--org-babel-block-eop lsp-bridge--org-babel-info-cache
-           (> (point) lsp-bridge--org-babel-block-bop) (< (point) lsp-bridge--org-babel-block-eop))
+           (>= (point) lsp-bridge--org-babel-block-bop) (<= (point) lsp-bridge--org-babel-block-eop))
       lsp-bridge--org-babel-info-cache
     (setq-local lsp-bridge--org-babel-info-cache (org-element-context))
-    (unless (eq (org-element-type lsp-bridge--org-babel-info-cache) 'src-block)
-      (setq-local lsp-bridge--org-babel-info-cache nil))
-    (when lsp-bridge--org-babel-info-cache
-      (setq-local lsp-bridge--org-babel-block-bop (org-element-property :begin lsp-bridge--org-babel-info-cache))
-      (setq-local lsp-bridge--org-babel-block-eop (org-element-property :end lsp-bridge--org-babel-info-cache))
+    (if (not (eq (org-element-type lsp-bridge--org-babel-info-cache) 'src-block))
+        (setq-local lsp-bridge--org-babel-info-cache nil)
+      (save-excursion
+        (goto-char (org-element-property :begin lsp-bridge--org-babel-info-cache))
+        (setq-local lsp-bridge--org-babel-block-bop (1+ (point-at-eol))))
+      (setq-local lsp-bridge--org-babel-block-eop (+ lsp-bridge--org-babel-block-bop
+                                                     (length (org-element-property :value lsp-bridge--org-babel-info-cache))))
       ;; sync it in `lsp-bridge-monitor-before-change'
       (setq-local lsp-bridge--org-update-file-before-change t)))
 
@@ -1156,7 +1158,7 @@ So we build this macro to restore postion after code format."
                lsp-bridge--org-update-file-before-change)
       (setq-local lsp-bridge--org-update-file-before-change nil)
       (lsp-bridge-call-file-api "update_file" (buffer-name)
-                                (line-number-at-pos lsp-bridge--org-babel-block-bop)))
+                                (1- (line-number-at-pos lsp-bridge--org-babel-block-bop))))
 
     (setq-local lsp-bridge--before-change-begin-pos (lsp-bridge--point-position begin))
     (setq-local lsp-bridge--before-change-end-pos (lsp-bridge--point-position end))))
